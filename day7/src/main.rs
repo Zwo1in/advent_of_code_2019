@@ -1,9 +1,8 @@
-use permutohedron::Heap;
-use log::{warn, info, debug, trace};
-use env_logger;
+use itertools::Itertools;
 
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::thread;
+use std::collections::VecDeque;
 
 const INPUT: &str = include_str!("../input");
 fn load_prog() -> Vec<i32> {
@@ -40,15 +39,12 @@ struct Order {
 
 impl Order {
     fn new(raw: i32) -> Self {
-        trace!("Opcode: {}", raw);
         let ord = raw%100;
-        trace!("Order: {}", ord);
         let raw = raw.to_string();
         let mut params = raw.chars().rev().skip(2).map(|c| c.to_digit(10).unwrap());
         let params = [params.next().unwrap_or(0).as_mode(),
                       params.next().unwrap_or(0).as_mode(),
                       params.next().unwrap_or(0).as_mode()];
-        trace!("Params: {:?}", params);
         Self { ord, params }
     }
 
@@ -60,7 +56,6 @@ impl Order {
             7..=8 => 3,
             _ => panic!("Wrong order"),
         };
-        trace!("Args: {}", args_len);
         let args: Vec<_> = code[*pc+1..=*pc+args_len]
             .iter().enumerate()
             .map(|(n, arg)| {
@@ -74,57 +69,35 @@ impl Order {
                 }
             })
             .collect();
-        args.iter().for_each(|arg| trace!("\t{}", arg));
         match self.ord {
             1 => {
-                trace!("Saving {} to {}, result of {} + {}", args[0]+args[1], args[2], args[0], args[1]);
                 code[args[2] as usize] = args[0] + args[1];
                 *pc += 4;
             },
             2 => {
-                trace!("Saving {} to {}, result of {} * {}", args[0]*args[1], args[2], args[0], args[1]);
                 code[args[2] as usize] = args[0] * args[1];
                 *pc += 4;
             },
             3 => {
-                trace!("Waiting for input");
                 let inp = input.recv().unwrap();
-                trace!("Saving an input: {} to {}", inp, args[0]);
                 code[args[0] as usize] = inp;
                 *pc += 2;
             },
             4 => {
-                trace!("Returning output: {}", args[0]);
                 *pc += 2;
                 return Some(args[0]);
             },
             5 => {
-                trace!("Checking jump condition: {} != 0", args[0]);
-                if args[0] != 0 {
-                    trace!("Setting program counter to: {}", args[1]);
-                    *pc = args[1] as usize
-                } else {
-                    trace!("Pass");
-                    *pc += 3;
-                }
+                if args[0] != 0 { *pc = args[1] as usize } else { *pc += 3; }
             },
             6 => {
-                trace!("Checking jump condition: {} == 0", args[0]);
-                if args[0] == 0 {
-                    trace!("Setting program counter to: {}", args[1]);
-                    *pc = args[1] as usize
-                } else {
-                    trace!("Pass");
-                    *pc += 3;
-                }
+                if args[0] == 0 { *pc = args[1] as usize } else { *pc += 3; }
             },
             7 => {
-                trace!("Saving {} to {}, result of {} < {}", args[0]<args[1], args[2], args[0], args[1]);
                 code[args[2] as usize] = if args[0] < args[1] { 1 } else { 0 };
                 *pc += 4;
             },
             8 => {
-                trace!("Saving {} to {}, result of {} == {}", args[0]<args[1], args[2], args[0], args[1]);
                 code[args[2] as usize] = if args[0] == args[1] { 1 } else { 0 };
                 *pc += 4;
             },
@@ -141,6 +114,7 @@ struct IntcodePC {
 }
 
 impl IntcodePC {
+    #[allow(unused)]
     fn new(program: Vec<i32>) -> (Self, Sender<i32>, Receiver<i32>) {
         let (in_sender, in_receiver) = channel();
         let (out_sender, out_receiver) = channel();
@@ -155,31 +129,20 @@ impl IntcodePC {
 
     fn run(mut self) -> (Vec<i32>, Vec<i32>) {
         let mut pc = 0;
-        info!("Starting intcode computer");
         let mut outputs = vec![];
         while self.program[pc] != 99 {
-            trace!("Program counter: {}", pc);
             let order = Order::new(self.program[pc]);
             if let Some(ret) = order.execute(&mut self.program, &mut pc, &self.input) {
                 outputs.push(ret);
-                self.output.send(ret).unwrap_or_else(|e| warn!("Failed to send: {}", e));
+                self.output.send(ret).unwrap_or_else(|_| ());
             }
         }
-        info!("Program has finished");
         (self.program, outputs)
     }
 }
 
 fn max_thruster_signal(prog: Vec<i32>, feedback: bool) -> i32 {
-    let mut settings = if !feedback {
-        vec![0,1,2,3,4]
-    } else {
-        vec![5,6,7,8,9]
-    };
-    let heap = Heap::new(&mut settings);
-    let mut max = 0;
-    for data in heap {
-        let sequence = data.clone();
+    if !feedback { (0..5) } else { (5..10) }.permutations(5).map(|setup| {
         let (input, mut output) = channel();
         let mut amps = vec![];
         for _ in 0..5 {
@@ -187,34 +150,27 @@ fn max_thruster_signal(prog: Vec<i32>, feedback: bool) -> i32 {
             amps.push(amp.0);
             output = amp.1;
         }
+        let mut inputs: VecDeque<_> = amps.iter().map(|amp| amp.output.clone()).collect();
+        inputs.rotate_right(1);
         if feedback {
             amps[4].output = input.clone();
         }
-        let mut inputs: Vec<_> = amps.iter().map(|amp| amp.output.clone()).collect();
-        let _ = inputs.pop();
-        inputs.insert(0, input);
+        inputs[0] = input;
         let mut handles = vec![];
         for amp in amps {
             handles.push(thread::spawn(move || amp.run()));
         }
-        for (input, seq) in inputs.iter().zip(sequence.iter()) {
+        for (input, seq) in inputs.iter().zip(setup.iter()) {
             input.send(*seq).unwrap();
         }
         inputs[0].send(0).unwrap();
-        let mut result = vec![];
-        for handle in handles {
-            result = handle.join().unwrap().1;
-        }
-        if max < *result.last().unwrap() {
-            max = *result.last().unwrap();
-        }
-    }
-    max
+        handles.into_iter().map(|h| *h.join().unwrap().1.last().unwrap()).last().unwrap()
+    })
+    .max().unwrap()
 }
         
 
 fn main() {
-    env_logger::init();
     let prog = load_prog();
     println!("{}", max_thruster_signal(prog, true));
 }
