@@ -53,7 +53,7 @@ impl Order {
         let args: Vec<_> = code[*pc+1..=*pc+args_len]
             .iter().enumerate()
             .map(|(n, arg)| {
-                if n == args_len-1 && self.ord != 5 && self.ord != 6 {
+                if n == args_len-1 && self.ord != 4 && self.ord != 5 && self.ord != 6 {
                     *arg
                 } else {
                     match self.params[n] {
@@ -67,7 +67,7 @@ impl Order {
             1 => { code[args[2] as usize] = args[0] + args[1]; *pc += 4; },
             2 => { code[args[2] as usize] = args[0] * args[1]; *pc += 4; },
             3 => { code[args[0] as usize] = input; *pc += 2; },
-            4 => { *pc += 2; return Some(code[args[0] as usize]); },
+            4 => { *pc += 2; return Some(args[0]); },
             5 => { if args[0] != 0 { *pc = args[1] as usize } else { *pc += 3; } },
             6 => { if args[0] == 0 { *pc = args[1] as usize } else { *pc += 3; } },
             7 => { code[args[2] as usize] = if args[0] < args[1] { 1 } else { 0 }; *pc += 4; },
