@@ -59,12 +59,9 @@ fn load_image(content: &str) -> Vec<i32> {
 fn decode(image: Vec<i32>) -> Vec<i32> {
     (0..DIMS["height"]).cartesian_product(0..DIMS["width"])
         .map(|(y, x)| {
-            for layer in 0..DIMS["layers"] {
-                if image[index(x, y, layer)] != 2 {
-                    return image[index(x, y, layer)];
-                }
-            }
-            2
+            (0..DIMS["layers"]).filter(|layer| image[index(x, y, *layer)] != 2)
+                .map(|layer| image[index(x, y, layer)])
+                .next().unwrap_or(2)
         })
         .collect()
 }
