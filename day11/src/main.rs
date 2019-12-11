@@ -68,27 +68,28 @@ struct Board(HashMap<Pos, Color>);
 impl Board {
     fn print(self) {
         use MinMaxResult::MinMax;
-        let (min_x, max_x) = if let MinMax(l, h) = self.0.iter().minmax_by_key(|(k, _)| k.x) {
-            (l.0.x, h.0.x)
+        let (min_x, max_x) = if let MinMax(l, h) = self.0.keys().minmax_by_key(|k| k.x) {
+            (l.x, h.x)
         } else {
             return;
         };
-        let (min_y, max_y) = if let MinMax(l, h) = self.0.iter().minmax_by_key(|(k, _)| k.y) {
-            (l.0.y, h.0.y)
+        let (min_y, max_y) = if let MinMax(l, h) = self.0.keys().minmax_by_key(|k| k.y) {
+            (l.y, h.y)
         } else {
             return;
         };
-        for y in (min_y..=max_y).rev() {
-            for x in min_x..=max_x {
+        (min_y..=max_y).rev().cartesian_product(min_x..=max_x)
+            .for_each(|(y, x)| {
                 let color = if let Some(c) = self.0.get(&Pos { x, y }) {
                     *c
                 } else {
                     Color::Black
                 };
                 print!("{}", if color == Color::Black { ' ' } else { '#' });
-            }
-            println!("");
-        }
+                if x == max_x {
+                    println!("");
+                }
+            });
     }
 }
         
@@ -180,7 +181,8 @@ fn main() {
     let mut board = Board(HashMap::new());
     let (pc, input, output) = IntcodePC::new(prog);
     let mut picasso = Picasso::new(input, output);
-    thread::spawn(move || pc.run());
+    let pc_handle = thread::spawn(move || pc.run());
     picasso.run(&mut board);
     board.print();
+    pc_handle.join().unwrap();
 }
