@@ -1,0 +1,19 @@
+[package]
+name = "day12"
+version = "0.1.0"
+authors = ["Zwo1in <zwolin13@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "tracker"
+path = "src/tracker.rs"
+
+[dependencies]
+regex = "*"
+itertools = "*"
+criterion = "*"
+
+[[bench]]
+name = "step_bench"
+harness = false
