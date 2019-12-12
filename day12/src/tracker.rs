@@ -1,7 +1,8 @@
+#![allow(dead_code, unused_variables)]
+
 use regex::Regex;
 use itertools::Itertools;
 use std::fmt;
-use std::collections::HashMap;
 
 pub const INPUT: &'static str = include_str!("../input");
 
@@ -13,7 +14,7 @@ struct Vec3 {
 }
 
 impl Vec3 {
-    fn zero() -> Self {
+    const fn zero() -> Self {
         Self { x: 0, y: 0, z: 0 }
     }
 
@@ -84,20 +85,20 @@ impl Default for Moon {
     }
 }
 
-#[derive(Debug)]
-pub struct Tracker { moons: HashMap<String, Moon> }
+pub struct Tracker { moons: [Moon; 4] }
 
 impl Tracker {
     pub fn step(&mut self) {
+        let mut i = 0;
         let mut next_state = self.moons.clone();
         self.moons.iter()
             .cartesian_product(self.moons.iter())
-            .filter(|((name_lhs, _), (name_rhs, _))| name_lhs != name_rhs)
-            .for_each(|((name, lhs), (_, rhs))| {
+            .filter(|(lhs, rhs)| lhs != rhs)
+            .for_each(|(lhs, rhs)| {
                 use std::cmp::Ordering::*;
                 let pos_lhs = [lhs.pos.x, lhs.pos.y, lhs.pos.z];
                 let pos_rhs = [rhs.pos.x, rhs.pos.y, rhs.pos.z];
-                next_state.get_mut(name).unwrap().vel += Vec3::from_vec(
+                next_state[i/3].vel += Vec3::from_vec(
                     pos_lhs.iter()
                         .zip(pos_rhs.iter())
                         .map(|(lhs, rhs)| {
@@ -109,13 +110,14 @@ impl Tracker {
                         })
                         .collect() 
                     );
+                i += 1;
             });
-        next_state.iter_mut().for_each(|(_, moon)| moon.pos += moon.vel);
+        next_state.iter_mut().for_each(|moon| moon.pos += moon.vel);
         self.moons = next_state;
     }
 
     pub fn total_energy(&self) -> i128 {
-        self.moons.values()
+        self.moons.iter()
             .map(|moon| moon.potential_energy() * moon.kinetic_energy())
             .fold1(|acc, val| acc + val)
             .unwrap()
@@ -125,7 +127,7 @@ impl Tracker {
 impl fmt::Display for Tracker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let moons: String = self.moons.iter()
-            .map(|(name, moon)| format!("{: <8}  <Pos {}>  <Vel {}>", name, moon.pos, moon.vel))
+            .map(|moon| format!("<Pos {}>  <Vel {}>", moon.pos, moon.vel))
             .intersperse("\n".to_owned())
             .collect();
         write!(f, "{}\n", moons)
@@ -134,37 +136,26 @@ impl fmt::Display for Tracker {
 
 pub fn prepare_tracker(data: &'static str) -> Tracker {
     let positions = parse_input(data);
-    let moons = positions.iter().zip(["Io", "Europa", "Ganymede", "Callisto"].into_iter())
-        .map(|(&pos, &name)| {
-            (name.to_owned(), Moon { pos, ..Default::default() })
-        })
+    let mut moons: Vec<_> = positions.iter()
+        .map(|&pos| Moon { pos, ..Default::default() })
+        .rev()
         .collect();
+    let moons = [moons.pop().unwrap(), moons.pop().unwrap(), moons.pop().unwrap(), moons.pop().unwrap()];
     Tracker { moons }
 }
 
 fn main() {
-    let positions = parse_input(INPUT);
-    let moons: HashMap<_, _> = positions.iter().zip(["Io", "Europa", "Ganymede", "Callisto"].into_iter())
-        .map(|(&pos, &name)| {
-            (name.to_owned(), Moon { pos, ..Default::default() })
-        })
-        .collect();
-
-    let mut tracker = Tracker { moons: moons.clone() };
+    let mut tracker = prepare_tracker(INPUT);
     println!("{}", tracker);
     (0..1000).for_each(|_| tracker.step());
     println!("{}", tracker);
     println!("Total energy: {}", tracker.total_energy());
 
+    let mut tracker = prepare_tracker(INPUT);
     let mut n = 0u128;
-    let mut tracker = Tracker { moons };
     loop {
         n += 1;
         tracker.step();
-        if positions.iter().zip(tracker.moons.values()).all(|(&lhs, rhs)| lhs == rhs.pos && rhs.vel == Vec3::zero()) {
-            println!("Tracker in beggining state after {} steps\n{}", n, tracker);
-            break;
-        }
     }
 }
 
@@ -193,14 +184,14 @@ mod tests {
         let mut tracker = prepare_tracker(SAMPLE1);
         (0..10).for_each(|_| tracker.step());
         assert_eq!(
-            tracker.moons["Europa"],
+            tracker.moons[1],
             Moon {
                 pos: Vec3 { x: 4, y: 10, z: 9 },
                 vel: Vec3 { x: -3, y: 7, z: -2 },
             }
         );
         assert_eq!(
-            tracker.moons["Callisto"],
+            tracker.moons[3],
             Moon {
                 pos: Vec3 { x: 5, y: -10, z: 3 },
                 vel: Vec3 { x: 0, y: -4, z: 5 },
@@ -215,4 +206,3 @@ mod tests {
         assert_eq!(tracker.total_energy(), 119+216+135+32);
     }
 }
-
