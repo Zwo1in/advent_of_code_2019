@@ -89,31 +89,50 @@ pub struct Tracker { moons: [Moon; 4] }
 
 impl Tracker {
     pub fn step(&mut self) {
-        let mut i = 0;
-        let mut next_state = self.moons.clone();
-        self.moons.iter()
-            .cartesian_product(self.moons.iter())
-            .filter(|(lhs, rhs)| lhs != rhs)
-            .for_each(|(lhs, rhs)| {
-                use std::cmp::Ordering::*;
-                let pos_lhs = [lhs.pos.x, lhs.pos.y, lhs.pos.z];
-                let pos_rhs = [rhs.pos.x, rhs.pos.y, rhs.pos.z];
-                next_state[i/3].vel += Vec3::from_vec(
-                    pos_lhs.iter()
-                        .zip(pos_rhs.iter())
-                        .map(|(lhs, rhs)| {
-                            match lhs.cmp(&rhs) {
-                                Less    => 1,
-                                Equal   => 0,
-                                Greater => -1,
-                            }
-                        })
-                        .collect() 
-                    );
-                i += 1;
-            });
-        next_state.iter_mut().for_each(|moon| moon.pos += moon.vel);
-        self.moons = next_state;
+        use std::cmp::Ordering::*;
+        let mut next_vels = [
+            unsafe { self.moons.get_unchecked(0).vel },
+            unsafe { self.moons.get_unchecked(1).vel },
+            unsafe { self.moons.get_unchecked(2).vel },
+            unsafe { self.moons.get_unchecked(3).vel },
+        ];
+        for i in 0..4 {
+            for j in 0..4 {
+                if i == j { continue; }
+                unsafe {
+                    next_vels.get_unchecked_mut(i).x += match 
+                        self.moons.get_unchecked(i).pos.x.cmp(&self.moons.get_unchecked(j).pos.x)
+                    {
+                        Less => 1,
+                        Equal => 0,
+                        Greater => -1,
+                    };
+                    next_vels.get_unchecked_mut(i).y += match 
+                        self.moons.get_unchecked(i).pos.y.cmp(&self.moons.get_unchecked(j).pos.y)
+                    {
+                        Less => 1,
+                        Equal => 0,
+                        Greater => -1,
+                    };
+                    next_vels.get_unchecked_mut(i).z += match 
+                        self.moons.get_unchecked(i).pos.z.cmp(&self.moons.get_unchecked(j).pos.z)
+                    {
+                        Less => 1,
+                        Equal => 0,
+                        Greater => -1,
+                    };
+                }
+            }
+        }
+
+        (0..4).for_each(|n| {
+            unsafe {
+                let mut current = self.moons.get_unchecked_mut(n);
+                let curr_vel = next_vels.get_unchecked(n);
+                current.vel = *curr_vel;
+                current.pos += *curr_vel;
+            }
+        });
     }
 
     pub fn total_energy(&self) -> i128 {
@@ -144,19 +163,26 @@ pub fn prepare_tracker(data: &'static str) -> Tracker {
     Tracker { moons }
 }
 
-fn main() {
-    let mut tracker = prepare_tracker(INPUT);
-    println!("{}", tracker);
-    (0..1000).for_each(|_| tracker.step());
-    println!("{}", tracker);
-    println!("Total energy: {}", tracker.total_energy());
-
-    let mut tracker = prepare_tracker(INPUT);
-    let mut n = 0u128;
-    loop {
-        n += 1;
-        tracker.step();
-    }
+pub fn is_initial_state(tracker: &Tracker) -> bool {
+    const INITIAL_STATE: [Moon; 4] = [
+        Moon {
+            pos: Vec3 { x: -9, y: -1, z: -1 },
+            vel: Vec3::zero(),
+        },
+        Moon {
+            pos: Vec3 { x: 2, y: 9, z: 5 },
+            vel: Vec3::zero(),
+        },
+        Moon {
+            pos: Vec3 { x: 10, y: 18, z: -12 },
+            vel: Vec3::zero(),
+        },
+        Moon {
+            pos: Vec3 { x: -6, y: 15, z: -7 },
+            vel: Vec3::zero(),
+        },
+    ];
+    tracker.moons == INITIAL_STATE
 }
 
 #[cfg(test)]
