@@ -7,6 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+maplit = "*"
 itertools = "*"
 trees = "*"
 env_logger = "*"
@@ -14,4 +15,3 @@ log = "*"
 
 [dev-dependencies]
 pretty_assertions = "*"
-maplit = "*"
