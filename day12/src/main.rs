@@ -1,4 +1,4 @@
-use tracker::{prepare_tracker, is_initial_state, INPUT};
+use tracker::*;
 
 fn main() {
     let mut tracker = prepare_tracker(INPUT);
@@ -9,13 +9,34 @@ fn main() {
 
     let mut tracker = prepare_tracker(INPUT);
     let mut n = 0u128;
-    loop {
+    let x_period = loop {
         n += 1;
-        tracker.step();
-        if is_initial_state(&tracker) {
-            println!("Found initial state after {} steps", n);
-            break;
+        tracker.step_x();
+        if is_initial_state_x(&tracker) {
+            println!("{}", n);
+            break n;
         }
-    }
+    };
+    let mut tracker = prepare_tracker(INPUT);
+    let mut n = 0u128;
+    let y_period = loop {
+        n += 1;
+        tracker.step_y();
+        if is_initial_state_y(&tracker) {
+            println!("{}", n);
+            break n;
+        }
+    };
+    let mut tracker = prepare_tracker(INPUT);
+    let mut n = 0u128;
+    let z_period = loop {
+        n += 1;
+        tracker.step_z();
+        if is_initial_state_z(&tracker) {
+            println!("{}", n);
+            break n;
+        }
+    };
+    println!("{}, {}, {}", x_period, y_period, z_period);
 }
 
