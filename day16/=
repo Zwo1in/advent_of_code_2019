@@ -1,0 +1,43 @@
+fn parse_input(input: &'static str) -> Vec<i32> {
+    input.chars()
+        .map(|ch| ch.to_digit(10).unwrap() as i32)
+        .collect()
+}
+
+fn apply_transform(fft: &Vec<i32>, position: u32) -> i32 {
+    const FACTORS: [i32; 4] = [0, 1, 0, -1];
+    let multipilers = FACTORS.iter().flat_map(|n| vec![n; position as usize])
+        .skip(1)
+        .cycle();
+    fft.iter().zip(multipilers)
+        .map(|(&a, &b)| a*b)
+        .sum::<i32>()
+        .abs()
+        .rem_euclid(10)
+}
+
+fn next_phase(fft: Vec<i32>) -> Vec<i32> {
+    (1..fft.len()).map(|a| a*2);
+        //.flat_map(|n| apply_transform(&fft, 1))
+        //.collect()
+}
+
+fn main() {
+    println!("Hello, world!");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn after_100_phases1() {
+        let input = "80871224585914546619083218645595";
+        let mut signal = parse_input(input);
+        for _ in 0..100 {
+            println!("{:?}", signal);
+            signal = next_phase(signal);
+        }
+        assert_eq!(&signal[..8], &[2, 4, 1, 7, 6, 1, 7, 6]);
+    }
+}
